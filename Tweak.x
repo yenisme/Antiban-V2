@@ -1,171 +1,183 @@
 #import <UIKit/UIKit.h>
-#import <QuartzCore/QuartzCore.h>
+#import <Foundation/Foundation.h>
 
-// --- KHAI BÁO GIAO DIỆN (Yên Mod View) ---
-
-@interface YenCyberView : UIView
-@property (nonatomic, strong) UILabel *lblTitle;
-@property (nonatomic, strong) UILabel *lblLog;
-@property (nonatomic, strong) UIButton *btnAction;
-@property (nonatomic, strong) UIProgressView *progressBar;
-@property (nonatomic, strong) NSTimer *typingTimer;
-@property (nonatomic, assign) NSInteger typingIndex;
-@property (nonatomic, strong) NSString *fullTitleText;
+// --- Khai báo giao diện Hacker View ---
+@interface YenHackerView : UIView
+@property (nonatomic, strong) UILabel *titleLabel;
+@property (nonatomic, strong) UILabel *consoleLabel;
+@property (nonatomic, strong) UIView *loadingBar;
+@property (nonatomic, strong) UIView *loadingFill;
+@property (nonatomic, strong) UIButton *activateBtn;
 @end
 
-@implementation YenCyberView
+@implementation YenHackerView
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
-        [self setupCyberUI];
+        // 1. Setup nền đen mờ ảo + Viền Neon
+        self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
+        self.layer.cornerRadius = 10;
+        self.layer.borderWidth = 1.5;
+        self.layer.borderColor = [UIColor greenColor].CGColor; // Màu xanh Hacker
+        self.layer.shadowColor = [UIColor greenColor].CGColor;
+        self.layer.shadowRadius = 8;
+        self.layer.shadowOpacity = 0.8;
+        self.clipsToBounds = YES;
+
+        // 2. Tiêu đề "Yên MOD IOS"
+        _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(5, 5, frame.size.width - 10, 20)];
+        _titleLabel.text = @"[ YÊN MOD IOS ]";
+        _titleLabel.textColor = [UIColor cyanColor];
+        _titleLabel.font = [UIFont fontWithName:@"Courier-Bold" size:14];
+        _titleLabel.textAlignment = NSTextAlignmentCenter;
+        [self addSubview:_titleLabel];
+
+        // 3. Console hiển thị text chạy
+        _consoleLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 30, frame.size.width - 20, 40)];
+        _consoleLabel.textColor = [UIColor greenColor];
+        _consoleLabel.font = [UIFont fontWithName:@"Courier-New" size:11];
+        _consoleLabel.numberOfLines = 2;
+        _consoleLabel.text = @"";
+        [self addSubview:_consoleLabel];
+
+        // 4. Thanh Loading Bar
+        _loadingBar = [[UIView alloc] initWithFrame:CGRectMake(10, 80, frame.size.width - 20, 6)];
+        _loadingBar.backgroundColor = [UIColor darkGrayColor];
+        _loadingBar.layer.cornerRadius = 3;
+        [self addSubview:_loadingBar];
+
+        _loadingFill = [[UIView alloc] initWithFrame:CGRectMake(10, 80, 0, 6)]; // Bắt đầu từ 0
+        _loadingFill.backgroundColor = [UIColor greenColor];
+        _loadingFill.layer.cornerRadius = 3;
+        [self addSubview:_loadingFill];
+
+        // 5. Nút Bật Antiban (Ban đầu ẩn đi)
+        _activateBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+        _activateBtn.frame = CGRectMake(10, 80, frame.size.width - 20, 30); // Đè lên chỗ loading sau khi xong
+        [_activateBtn setTitle:@"[ BẬT ANTIBAN ]" forState:UIControlStateNormal];
+        [_activateBtn setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+        _activateBtn.backgroundColor = [UIColor greenColor];
+        _activateBtn.layer.cornerRadius = 5;
+        _activateBtn.titleLabel.font = [UIFont fontWithName:@"Courier-Bold" size:13];
+        _activateBtn.hidden = YES; // Ẩn nút đi chờ loading
+        [_activateBtn addTarget:self action:@selector(handleButtonPress) forControlEvents:UIControlEventTouchUpInside];
+        [self addSubview:_activateBtn];
+
+        // Bắt đầu hiệu ứng
+        [self startHackingEffect];
     }
     return self;
 }
 
-- (void)setupCyberUI {
-    // 1. Background style Hacker
-    self.backgroundColor = [UIColor colorWithRed:0.05 green:0.05 blue:0.05 alpha:0.95]; // Đen mờ
-    self.layer.borderColor = [UIColor greenColor].CGColor; // Viền xanh Neon
-    self.layer.borderWidth = 1.5;
-    self.layer.cornerRadius = 10;
-    self.layer.shadowColor = [UIColor greenColor].CGColor;
-    self.layer.shadowRadius = 8;
-    self.layer.shadowOpacity = 0.8;
-    self.clipsToBounds = NO;
-
-    // 2. Title Label (Để chạy hiệu ứng gõ chữ)
-    _lblTitle = [[UILabel alloc] initWithFrame:CGRectMake(5, 5, self.frame.size.width - 10, 25)];
-    _lblTitle.textColor = [UIColor greenColor];
-    _lblTitle.font = [UIFont fontWithName:@"Courier-Bold" size:14]; // Font kiểu code
-    _lblTitle.textAlignment = NSTextAlignmentCenter;
-    _lblTitle.text = @""; // Để trống để chạy effect
-    [self addSubview:_lblTitle];
-
-    // 3. Log Label (Hiện text Loading...)
-    _lblLog = [[UILabel alloc] initWithFrame:CGRectMake(5, 35, self.frame.size.width - 10, 40)];
-    _lblLog.textColor = [UIColor cyanColor];
-    _lblLog.font = [UIFont fontWithName:@"Courier" size:10];
-    _lblLog.numberOfLines = 3;
-    _lblLog.text = @"[SYSTEM] Ready...\n[STATUS] Safe\nWaiting for input...";
-    [self addSubview:_lblLog];
-
-    // 4. Progress Bar (Thanh Loading ảo)
-    _progressBar = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleBar];
-    _progressBar.frame = CGRectMake(10, 80, self.frame.size.width - 20, 5);
-    _progressBar.progressTintColor = [UIColor redColor];
-    _progressBar.trackTintColor = [UIColor darkGrayColor];
-    _progressBar.progress = 0.0;
-    [self addSubview:_progressBar];
-
-    // 5. Button "Bật Antiban"
-    _btnAction = [UIButton buttonWithType:UIButtonTypeCustom];
-    _btnAction.frame = CGRectMake(10, 95, self.frame.size.width - 20, 30);
-    [_btnAction setTitle:@"KÍCH HOẠT ANTIBAN" forState:UIControlStateNormal];
-    _btnAction.titleLabel.font = [UIFont fontWithName:@"Courier-Bold" size:12];
-    [_btnAction setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
-    _btnAction.backgroundColor = [UIColor greenColor];
-    _btnAction.layer.cornerRadius = 5;
-    
-    // Hiệu ứng bấm nút
-    [_btnAction addTarget:self action:@selector(startHackingSequence) forControlEvents:UIControlEventTouchUpInside];
-    [self addSubview:_btnAction];
-
-    // Bắt đầu chạy chữ "Yên MOD IOS"
-    _fullTitleText = @"_Yên MOD IOS_";
-    _typingIndex = 0;
-    _typingTimer = [NSTimer scheduledTimerWithTimeInterval:0.15 target:self selector:@selector(typeCharacter) userInfo:nil repeats:YES];
-}
-
-// Hàm chạy chữ từng ký tự
-- (void)typeCharacter {
-    if (_typingIndex < _fullTitleText.length) {
-        NSString *subString = [_fullTitleText substringToIndex:_typingIndex + 1];
-        _lblTitle.text = [subString stringByAppendingString:@"█"]; // Thêm con trỏ nhấp nháy
-        _typingIndex++;
-    } else {
-        [_typingTimer invalidate];
-        _lblTitle.text = _fullTitleText; // Xóa con trỏ khi xong
+// --- Hiệu ứng đánh máy (Typewriter Effect) ---
+- (void)typeText:(NSString *)text toLabel:(UILabel *)label atIndex:(NSInteger)index {
+    if (index < text.length) {
+        NSString *charStr = [text substringWithRange:NSMakeRange(index, 1)];
+        label.text = [label.text stringByAppendingString:charStr];
         
-        // Hiệu ứng nhấp nháy border sau khi load xong tên
-        CABasicAnimation *animation = [CABasicAnimation animationWithKeyPath:@"borderColor"];
-        animation.fromValue = (id)[UIColor greenColor].CGColor;
-        animation.toValue = (id)[UIColor clearColor].CGColor;
-        animation.autoreverses = YES;
-        animation.duration = 0.5;
-        animation.repeatCount = HUGE_VALF;
-        [self.layer addAnimation:animation forKey:@"glowBorder"];
+        // Tốc độ gõ phím ngẫu nhiên cho giống người thật
+        double delayInSeconds = 0.05 + (arc4random_uniform(5) / 100.0);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self typeText:text toLabel:label atIndex:index + 1];
+        });
     }
 }
 
-// Hàm fake loading "Hacker lỏ"
-- (void)startHackingSequence {
-    _btnAction.enabled = NO;
-    [_btnAction setTitle:@"ĐANG XÂM NHẬP..." forState:UIControlStateNormal];
-    _btnAction.backgroundColor = [UIColor grayColor];
+// --- Logic Loading 5 giây ---
+- (void)startHackingEffect {
+    // 1. Chạy chữ ngầu lòi
+    NSString *logText = @"Connecting to Server...\nBypassing Security...";
+    [self typeText:logText toLabel:_consoleLabel atIndex:0];
+
+    // 2. Chạy thanh Loading trong 5s
+    [UIView animateWithDuration:5.0 animations:^{
+        CGRect frame = self.loadingFill.frame;
+        frame.size.width = self.frame.size.width - 20;
+        self.loadingFill.frame = frame;
+    } completion:^(BOOL finished) {
+        // Sau khi load xong 5s
+        [self loadingFinished];
+    }];
+}
+
+- (void)loadingFinished {
+    // Rung nhẹ haptic báo hiệu xong (nếu thích)
+    UINotificationFeedbackGenerator *generator = [[UINotificationFeedbackGenerator alloc] init];
+    [generator notificationOccurred:UINotificationFeedbackTypeSuccess];
+
+    // Cập nhật giao diện: Ẩn loading, hiện nút
+    _consoleLabel.text = @"SYSTEM: READY\nSTATUS: UNDETECTED";
+    _loadingBar.hidden = YES;
+    _loadingFill.hidden = YES;
+    _activateBtn.hidden = NO;
     
-    // Tạo luồng background giả lập
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        
-        // Bước 1: Kết nối server ảo
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self.lblLog.text = @"> Connecting to Server...\n> Bypass Garena Security...";
-            self.progressBar.progress = 0.2;
-        });
-        [NSThread sleepForTimeInterval:1.0];
+    // Hiệu ứng nút nhấp nháy
+    _activateBtn.alpha = 0;
+    [UIView animateWithDuration:0.5 animations:^{
+        self.activateBtn.alpha = 1;
+    }];
+}
 
-        // Bước 2: Inject code ảo
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self.lblLog.text = @"> Injecting Memory...\n> Address: 0xDEADBEEF\n> Anticheat: DISABLED";
-            self.progressBar.progress = 0.6;
-            self.progressBar.progressTintColor = [UIColor yellowColor];
-        });
-        [NSThread sleepForTimeInterval:1.5];
-
-        // Bước 3: Hoàn tất
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self.lblLog.text = @"> SUCCESS!\n> Antiban: ACTIVE\n> Safe Mode: ON";
-            self.progressBar.progress = 1.0;
-            self.progressBar.progressTintColor = [UIColor greenColor];
+- (void)handleButtonPress {
+    // Hiệu ứng khi bấm nút
+    [_activateBtn setTitle:@"ACTIVATED!" forState:UIControlStateNormal];
+    _activateBtn.backgroundColor = [UIColor cyanColor];
+    
+    // Delay 0.5s cho người dùng nhìn thấy chữ Activated rồi mới biến mất
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [UIView animateWithDuration:0.5 animations:^{
+            self.alpha = 0; // Fade out
+            self.transform = CGAffineTransformMakeScale(0.1, 0.1); // Thu nhỏ lại
+        } completion:^(BOOL finished) {
+            [self removeFromSuperview]; // Xoá khỏi màn hình
             
-            [self.btnAction setTitle:@"ĐÃ BẬT ANTIBAN" forState:UIControlStateNormal];
-            self.btnAction.backgroundColor = [UIColor cyanColor];
-            
-            // Rung nhẹ máy báo hiệu thành công
-            UIImpactFeedbackGenerator *generator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleHeavy];
-            [generator impactOccurred];
-        });
+            // TODO: Chèn code Antiban thật của bạn vào đây
+            NSLog(@"[Yên MOD] Antiban Enabled!"); 
+        }];
     });
 }
+
 @end
 
+// --- Phần Hook vào Game ---
 
-// --- HOOK VÀO GAME (UnityFramework hoặc Application) ---
+// Tạo cửa sổ tĩnh để giữ View
+static UIWindow *alertWindow = nil;
 
-// Hook vào UIWindow để hiện thị view đè lên tất cả
-%hook UIWindow
+void showCyberAlert() {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // Tạo Window mới nằm trên cùng
+        alertWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+        alertWindow.windowLevel = UIWindowLevelAlert + 1;
+        alertWindow.backgroundColor = [UIColor clearColor];
+        alertWindow.rootViewController = [UIViewController new]; // Dummy VC
+        alertWindow.hidden = NO;
+        alertWindow.userInteractionEnabled = YES; // Để bấm được nút xuyên qua chỗ trống
 
-- (void)makeKeyAndVisible {
-    %orig;
-    
-    // Kiểm tra để tránh add view nhiều lần
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
+        // Tính toán vị trí góc trái dưới (Cách lề trái 20, cách đáy 100)
+        CGFloat width = 220;
+        CGFloat height = 120;
+        CGFloat screenHeight = [UIScreen mainScreen].bounds.size.height;
         
-        // Kích thước UI nhỏ xinh góc trái dưới
-        CGFloat width = 180;
-        CGFloat height = 140;
-        // Màn hình ngang nên tính toán tọa độ
-        CGRect screenRect = [UIScreen mainScreen].bounds;
-        CGFloat screenHeight = screenRect.size.height;
-        // Cách cạnh trái 20, cách đáy 20
-        CGRect frame = CGRectMake(40, screenHeight - height - 20, width, height);
-
-        YenCyberView *hackView = [[YenCyberView alloc] initWithFrame:frame];
+        YenHackerView *hackerView = [[YenHackerView alloc] initWithFrame:CGRectMake(20, screenHeight - height - 80, width, height)];
         
-        // Thêm vào window cao nhất để luôn nổi
-        [self addSubview:hackView];
+        // Pass touches through window areas that aren't the hacker view
+        // (Đây là trick để chỉ chặn cảm ứng ở cái khung hack, còn lại vẫn bấm game được nếu muốn)
+        // Nhưng ở đây ta để đơn giản là hiện đè lên.
+        
+        [alertWindow addSubview:hackerView];
     });
 }
 
-%end
+// Hook vào lúc App khởi chạy xong
+%ctor {
+    // Lắng nghe sự kiện app khởi động xong để hiện UI
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidFinishLaunchingNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+        
+        // Delay 2 giây để game load logo xong mới hiện UI cho ngầu
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            showCyberAlert();
+        });
+    }];
+}
